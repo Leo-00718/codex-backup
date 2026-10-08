@@ -17,12 +17,36 @@ workspaces = [
 
 [exclude]
 # 【永不备份】凭据与密钥 —— 这些绝对不能上传到云盘
+# 这份清单覆盖了常见的一切放密钥的地方，不只是 Codex 自己的文件。
 secret_files = [
+    # Codex / 系统
     "auth.json",
     "cap_sid",
     ".sandbox_migration",
     "installation_id",
+    # 通用密钥文件
+    ".secrets.ps1",
+    ".secrets",
+    "secrets.ps1",
+    "secrets.json",
+    "credentials.json",
+    "id_rsa",
+    "id_ed25519",
+    "id_ecdsa",
+    ".npmrc",
+    ".pypirc",
+    ".netrc",
+    "_netrc",
+    # 环境变量文件（.env.example 是模板，不在其中，会被正常备份）
+    ".env",
+    ".env.local",
+    ".env.production",
+    ".env.development",
 ]
+
+# 通配符形式的密钥文件
+secret_globs = ["*.pem", "*.key", "*.pfx", "*.p12"]
+
 secret_dirs = [
     ".sandbox",
     ".sandbox-bin",
@@ -48,6 +72,7 @@ cache_dirs = [
     "site-packages",
     "dist-info",
 ]
+
 
 [pack]
 # 单个压缩包大小上限（MB）

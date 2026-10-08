@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import fnmatch
 import hashlib
 import json
 import os
@@ -132,13 +133,17 @@ def snapshot_db(src: Path, dst: Path):
         con.close()
 
 
-def walk(root: Path, cutoff=None, skip_dirs=(), skip_names=()):
+def walk(root: Path, cutoff=None, skip_dirs=(), skip_names=(), secret_globs=()):
     """遍历文件；跳过缓存/密钥目录，可按修改时间过滤。"""
     skip = {d for d in skip_dirs}
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in skip and d not in skip_names]
         for fn in filenames:
             if fn in skip_names:
+                continue
+            if any(fnmatch.fnmatch(fn, g) for g in secret_globs):
+                continue
+            if fn.startswith(".env.") and not fn.endswith(".example"):
                 continue
             p = Path(dirpath) / fn
             try:
@@ -245,6 +250,7 @@ def main():
     secret_names = set(cfg["exclude"]["secret_files"])
     secret_dirs = set(cfg["exclude"]["secret_dirs"])
     cache_dirs = set(cfg["exclude"]["cache_dirs"])
+    secret_globs = tuple(cfg["exclude"].get("secret_globs", ()))
     codex = cfg["_codex"]
 
     st = {"sessions": 0, "msgs": 0, "works": 0, "works_bytes": 0,
@@ -287,7 +293,8 @@ def main():
         if not ws.is_dir():
             continue
         for src, s in walk(ws, cutoff=cutoff, skip_dirs=cache_dirs,
-                           skip_names=secret_names | secret_dirs):
+                           skip_names=secret_names | secret_dirs,
+                           secret_globs=secret_globs):
             rel = src.relative_to(ws)
             st["works"] += 1
             st["works_bytes"] += s.st_size
@@ -313,7 +320,8 @@ def main():
                 safe_copy(p, sysdata / item)
         else:
             for src, s in walk(p, cutoff=cutoff, skip_dirs=cache_dirs,
-                               skip_names=secret_names | secret_dirs):
+                               skip_names=secret_names | secret_dirs,
+                               secret_globs=secret_globs):
                 st["extra"] += 1
                 st["extra_bytes"] += s.st_size
                 if not args.dry_run:

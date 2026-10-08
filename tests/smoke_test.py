@@ -60,6 +60,15 @@ def build_fake_env(root: Path):
     (codex / ".sandbox-secrets").mkdir(exist_ok=True)
     (codex / ".sandbox-secrets" / "k.txt").write_text("SECRET", encoding="utf-8")
 
+    # 工作区里的密钥文件（回归用例：曾漏掉 .secrets.ps1 导致差点上传）
+    (work / ".secrets.ps1").write_text(
+        '$APP_SECRET = "REAL_SECRET_VALUE_MUST_NOT_BE_BACKED_UP"', encoding="utf-8")
+    (work / ".env").write_text("API_KEY=REAL_KEY_MUST_NOT_BE_BACKED_UP", encoding="utf-8")
+    (work / "id_rsa").write_text("-----BEGIN PRIVATE KEY-----", encoding="utf-8")
+    (work / "cert.pem").write_text("-----BEGIN CERTIFICATE-----", encoding="utf-8")
+    # 这个必须保留（模板，不含密钥）
+    (work / ".env.example").write_text("API_KEY=your_key_here", encoding="utf-8")
+
     # 工作目录里的文件
     (work / "note.md").write_text("# 测试文件\n", encoding="utf-8")
     (work / "sub").mkdir()
@@ -117,10 +126,15 @@ def main():
         check((scope / "01_对话" / "_原始数据").exists(), "对话原始数据已保存")
         check((scope / "04_清单.json").exists(), "清单已生成")
 
-        # 密钥排除
+        # 密钥排除（回归用例）
         leaked = [p for p in scope.rglob("*")
                   if p.is_file() and ("auth.json" in p.name or "SECRET" in p.read_text(errors="ignore"))]
         check(not leaked, "密钥文件已排除（auth.json / .sandbox-secrets 未进备份）")
+
+        names = {p.name for p in scope.rglob("*") if p.is_file()}
+        for bad in (".secrets.ps1", ".env", "id_rsa", "cert.pem"):
+            check(bad not in names, "密钥文件已排除：%s" % bad)
+        check(".env.example" in names, "模板文件 .env.example 被保留（没误杀）")
 
         # 数据库快照
         snap = scope / "05_系统数据" / "state_5.sqlite"

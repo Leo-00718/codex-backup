@@ -18,7 +18,23 @@ except ImportError:                   # pragma: no cover
 DEFAULTS = {
     "general": {"output_dir": "~/CodexBackup"},
     "source": {"codex_dir": "~/.codex", "workspaces": []},
-    "exclude": {"secret_files": [], "secret_dirs": [], "cache_dirs": []},
+    "exclude": {
+        # 默认就排除常见密钥文件，避免用户忘了配
+        "secret_files": [
+            "auth.json", "cap_sid", ".sandbox_migration", "installation_id",
+            ".secrets.ps1", ".secrets", "secrets.ps1", "secrets.json",
+            "credentials.json", "id_rsa", "id_ed25519",
+            ".npmrc", ".pypirc", ".netrc",
+            ".env", ".env.local", ".env.production", ".env.development",
+        ],
+        "secret_dirs": [".sandbox", ".sandbox-secrets", ".tmp", "tmp"],
+        "cache_dirs": [
+            "node_modules", "__pycache__", ".venv", "venv", ".git-lfs",
+            "Cache", "CachedData", "GPUCache", "Code Cache", "plugins",
+            "vendor_imports", "site-packages", "dist-info",
+        ],
+        "secret_globs": ["*.pem", "*.key", "*.pfx", "*.p12"],
+    },
     "pack": {"max_part_mb": 450},
     "upload": {"remote": "secret:", "transfers": 2},
 }
@@ -80,6 +96,17 @@ def load(explicit: str | None = None) -> dict:
         with open(path, "rb") as f:
             data = _toml.load(f)
     cfg = _merge(DEFAULTS, data)
+
+    # 安全红线：密钥类的排除规则只能「追加」，不能被配置文件覆盖掉。
+    # 否则用户写了一份自己的 secret_files，就会静默丢掉内置的保护
+    # （踩过的坑：曾因此差点把 .secrets.ps1 传上云盘）。
+    for key in ("secret_files", "secret_dirs", "secret_globs"):
+        merged = list(DEFAULTS["exclude"].get(key, []))
+        for item in (cfg["exclude"].get(key) or []):
+            if item not in merged:
+                merged.append(item)
+        cfg["exclude"][key] = merged
+
     cfg["_config_path"] = str(path) if path else "(使用内置默认值)"
 
     cfg["_output"] = expand(cfg["general"]["output_dir"])
