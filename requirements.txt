@@ -1,0 +1,3 @@
+# Python 3.11+ 内置 tomllib，无需额外依赖。
+# 3.9 / 3.10 需要 tomli 来读取 TOML 配置。
+tomli>=2.0; python_version < "3.11"

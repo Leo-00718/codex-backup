@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="430" viewBox="0 0 860 430" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif">
+  <rect width="860" height="430" fill="#ffffff"/>
+  <rect x="0.5" y="0.5" width="859" height="429" fill="none" stroke="#e1e4e8"/>
+
+  <text x="32" y="44" font-size="21" font-weight="700" fill="#24292e">为什么不能直接 rclone copy</text>
+  <text x="32" y="68" font-size="13" fill="#6a737d">2554 个散装文件 &#8594; 约 10000 次请求 &#8594; 触发 WebDAV 频率限制</text>
+
+  <rect x="32" y="88" width="796" height="180" rx="6" fill="#fafbfc" stroke="#e1e4e8"/>
+  <text x="48" y="112" font-size="12" font-weight="600" fill="#586069">上传速度（实测）</text>
+
+  <line x1="72" y1="140" x2="72" y2="240" stroke="#d1d5da"/>
+  <line x1="72" y1="240" x2="800" y2="240" stroke="#d1d5da"/>
+  <text x="78" y="134" font-size="10" fill="#959da5">776 KiB/s</text>
+  <text x="78" y="236" font-size="10" fill="#959da5">0</text>
+
+  <path d="M72 145 C 150 150, 190 165, 250 195 S 330 228, 420 236 S 560 239, 800 240"
+        fill="none" stroke="#cb2431" stroke-width="2.5" stroke-linecap="round"/>
+  <circle cx="72" cy="145" r="3.5" fill="#cb2431"/>
+  <circle cx="330" cy="228" r="3.5" fill="#cb2431"/>
+  <circle cx="800" cy="240" r="3.5" fill="#cb2431"/>
+
+  <line x1="330" y1="228" x2="330" y2="196" stroke="#cb2431" stroke-dasharray="3 3" stroke-width="1"/>
+  <rect x="262" y="172" width="158" height="22" rx="3" fill="#fff5f5" stroke="#f5b7bd"/>
+  <text x="272" y="187" font-size="10.5" fill="#cb2431">速度平滑衰减，不报错</text>
+
+  <rect x="556" y="204" width="222" height="22" rx="3" fill="#fff5f5" stroke="#f5b7bd"/>
+  <text x="566" y="219" font-size="10.5" fill="#cb2431">最后 503 BlockedTemporarily</text>
+
+  <text x="72" y="258" font-size="10" fill="#959da5">21:02</text>
+  <text x="762" y="258" font-size="10" fill="#959da5">21:20</text>
+
+  <text x="32" y="302" font-size="13" font-weight="700" fill="#24292e">解法：先打包，再上传</text>
+
+  <text x="32" y="330" font-size="12" fill="#586069">打包前</text>
+  <rect x="96" y="318" width="620" height="18" rx="3" fill="#cb2431"/>
+  <text x="726" y="332" font-size="12" font-weight="700" fill="#cb2431">~10000 次请求</text>
+
+  <text x="32" y="362" font-size="12" fill="#586069">打包后</text>
+  <rect x="96" y="350" width="6" height="18" rx="3" fill="#28a745"/>
+  <text x="112" y="364" font-size="12" font-weight="700" fill="#28a745">~20 次请求</text>
+  <text x="206" y="364" font-size="11" fill="#6a737d">（500 倍下降）</text>
+
+  <text x="32" y="402" font-size="12" fill="#586069">2554 个文件</text>
+  <text x="132" y="402" font-size="12" fill="#d1d5da">&#8594;</text>
+  <text x="148" y="402" font-size="12" font-weight="700" fill="#28a745">4 个压缩包</text>
+
+  <text x="292" y="402" font-size="12" fill="#586069">1635 MB</text>
+  <text x="360" y="402" font-size="12" fill="#d1d5da">&#8594;</text>
+  <text x="376" y="402" font-size="12" font-weight="700" fill="#28a745">838 MB</text>
+
+  <text x="500" y="402" font-size="12" fill="#586069">原本失败的备份</text>
+  <text x="606" y="402" font-size="12" fill="#d1d5da">&#8594;</text>
+  <text x="622" y="402" font-size="12" font-weight="700" fill="#28a745">6 分钟完成</text>
+</svg>

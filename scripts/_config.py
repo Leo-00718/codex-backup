@@ -1,0 +1,81 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""配置加载（各脚本共用）"""
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+try:
+    import tomllib as _toml          # Python 3.11+
+except ImportError:                   # pragma: no cover
+    try:
+        import tomli as _toml         # pip install tomli
+    except ImportError:
+        _toml = None
+
+DEFAULTS = {
+    "general": {"output_dir": "~/CodexBackup"},
+    "source": {"codex_dir": "~/.codex", "workspaces": []},
+    "exclude": {"secret_files": [], "secret_dirs": [], "cache_dirs": []},
+    "pack": {"max_part_mb": 450},
+    "upload": {"remote": "secret:", "transfers": 2},
+}
+
+
+def expand(p: str) -> Path:
+    """展开 ~ 和 %VAR% / $VAR 环境变量。"""
+    p = os.path.expandvars(os.path.expanduser(str(p)))
+    return Path(p)
+
+
+def _merge(base: dict, override: dict) -> dict:
+    out = {k: dict(v) if isinstance(v, dict) else v for k, v in base.items()}
+    for k, v in (override or {}).items():
+        if isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k].update(v)
+        else:
+            out[k] = v
+    return out
+
+
+def find_config(explicit: str | None = None) -> Path | None:
+    """按优先级找配置文件。"""
+    candidates = []
+    if explicit:
+        candidates.append(Path(explicit))
+    if os.environ.get("CODEX_BACKUP_CONFIG"):
+        candidates.append(Path(os.environ["CODEX_BACKUP_CONFIG"]))
+    here = Path(__file__).resolve().parent.parent       # 仓库根
+    candidates += [here / "config.toml", here / "config.example.toml"]
+    candidates.append(Path.home() / ".codex-backup.toml")
+    for c in candidates:
+        if c.is_file():
+            return c
+    return None
+
+
+def load(explicit: str | None = None) -> dict:
+    """载入配置，与默认值合并。"""
+    path = find_config(explicit)
+    data = {}
+    if path:
+        if _toml is None:
+            sys.exit("[错误] 需要 Python 3.11+，或先执行：pip install tomli")
+        with open(path, "rb") as f:
+            data = _toml.load(f)
+    cfg = _merge(DEFAULTS, data)
+    cfg["_config_path"] = str(path) if path else "(使用内置默认值)"
+
+    cfg["_output"] = expand(cfg["general"]["output_dir"])
+    cfg["_codex"] = expand(cfg["source"]["codex_dir"])
+    cfg["_workspaces"] = [expand(w) for w in cfg["source"].get("workspaces", [])]
+    return cfg
+
+
+def human(n: float) -> str:
+    for u in ("B", "KB", "MB", "GB", "TB"):
+        if n < 1024 or u == "TB":
+            return "%.1f %s" % (n, u)
+        n /= 1024.0

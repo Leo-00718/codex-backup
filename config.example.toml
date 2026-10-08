@@ -1,0 +1,63 @@
+# codex-backup 配置文件
+# 复制为 config.toml 后按需修改
+
+[general]
+# 备份产物存放位置（建议放在磁盘空间充足的分区）
+output_dir = "D:/CodexBackup"
+
+[source]
+# Codex 数据目录（一般不用改，脚本会自动检测 ~/.codex）
+codex_dir = "~/.codex"
+
+# 要一并备份的工作目录 —— 你的作品/项目所在的地方
+# 可以写多个。不写就只备份 Codex 数据本身。
+workspaces = [
+    "D:/Documents/MyProjects",
+]
+
+[exclude]
+# 【永不备份】凭据与密钥 —— 这些绝对不能上传到云盘
+secret_files = [
+    "auth.json",
+    "cap_sid",
+    ".sandbox_migration",
+    "installation_id",
+]
+secret_dirs = [
+    ".sandbox",
+    ".sandbox-bin",
+    ".sandbox-secrets",
+    ".tmp",
+    "tmp",
+]
+
+# 【默认不备份】可再生的缓存 —— 重装即可，没必要占空间和流量
+cache_dirs = [
+    "node_modules",
+    "__pycache__",
+    ".venv",
+    "venv",
+    ".git-lfs",
+    "Cache",
+    "CachedData",
+    "GPUCache",
+    "Code Cache",
+    "cache",
+    "plugins",
+    "vendor_imports",
+    "site-packages",
+    "dist-info",
+]
+
+[pack]
+# 单个压缩包大小上限（MB）
+# ⚠️ 必须小于你的网盘允许的单文件上传上限。
+# 坚果云 WebDAV 单文件上限 500 MB，这里留出余量取 450。
+max_part_mb = 450
+
+[upload]
+# rclone 远程名（在 setup 向导里配置）
+remote = "secret:"
+
+# 每次上传的并发数
+transfers = 2
