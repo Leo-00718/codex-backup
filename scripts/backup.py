@@ -133,11 +133,17 @@ def snapshot_db(src: Path, dst: Path):
         con.close()
 
 
-def walk(root: Path, cutoff=None, skip_dirs=(), skip_names=(), secret_globs=()):
+def walk(root: Path, cutoff=None, skip_dirs=(), skip_names=(), secret_globs=(), skip_paths=()):
     """遍历文件；跳过缓存/密钥目录，可按修改时间过滤。"""
     skip = {d for d in skip_dirs}
+    skips = {Path(x) for x in skip_paths}
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in skip and d not in skip_names]
+        cur = Path(dirpath)
+        if cur in skips:
+            dirnames[:] = []
+            continue
+        dirnames[:] = [d for d in dirnames if d not in skip and d not in skip_names
+                       and (cur / d) not in skips]
         for fn in filenames:
             if fn in skip_names:
                 continue
@@ -251,6 +257,7 @@ def main():
     secret_dirs = set(cfg["exclude"]["secret_dirs"])
     cache_dirs = set(cfg["exclude"]["cache_dirs"])
     secret_globs = tuple(cfg["exclude"].get("secret_globs", ()))
+    exclude_paths = [_config.expand(x) for x in cfg["exclude"].get("paths", [])]
     codex = cfg["_codex"]
 
     st = {"sessions": 0, "msgs": 0, "works": 0, "works_bytes": 0,
@@ -294,7 +301,8 @@ def main():
             continue
         for src, s in walk(ws, cutoff=cutoff, skip_dirs=cache_dirs,
                            skip_names=secret_names | secret_dirs,
-                           secret_globs=secret_globs):
+                           secret_globs=secret_globs,
+                           skip_paths=exclude_paths):
             rel = src.relative_to(ws)
             st["works"] += 1
             st["works_bytes"] += s.st_size

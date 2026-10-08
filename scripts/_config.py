@@ -34,6 +34,8 @@ DEFAULTS = {
             "vendor_imports", "site-packages", "dist-info",
         ],
         "secret_globs": ["*.pem", "*.key", "*.pfx", "*.p12"],
+        # 整目录排除（第三方项目 / 可重新下载的东西）
+        "paths": [],
     },
     "pack": {"max_part_mb": 450},
     "upload": {"remote": "secret:", "transfers": 2},

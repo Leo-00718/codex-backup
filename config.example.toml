@@ -47,6 +47,12 @@ secret_files = [
 # 通配符形式的密钥文件
 secret_globs = ["*.pem", "*.key", "*.pfx", "*.p12"]
 
+# 整目录排除 —— 第三方项目 / 可重新下载的东西 / 含密钥的目录
+# 例：把克隆下来的上游 OSS 项目排除掉，避免几万个文件进备份
+paths = [
+    # "~/projects/some-third-party-clone",
+]
+
 secret_dirs = [
     ".sandbox",
     ".sandbox-bin",

@@ -69,6 +69,12 @@ def build_fake_env(root: Path):
     # 这个必须保留（模板，不含密钥）
     (work / ".env.example").write_text("API_KEY=your_key_here", encoding="utf-8")
 
+    # 模拟"克隆下来的第三方项目" —— 应被 exclude.paths 整目录跳过
+    vendor = work / "vendor-clone"
+    vendor.mkdir()
+    (vendor / "README.md").write_text("# third party", encoding="utf-8")
+    (vendor / "huge.md").write_text("x" * 1000, encoding="utf-8")
+
     # 工作目录里的文件
     (work / "note.md").write_text("# 测试文件\n", encoding="utf-8")
     (work / "sub").mkdir()
@@ -77,13 +83,15 @@ def build_fake_env(root: Path):
     return codex, work
 
 
-def write_config(path: Path, out: Path, codex: Path, work: Path):
+def write_config(path: Path, out: Path, codex: Path, work: Path, extra_paths=()):
+    paths = "".join('    "%s",\n' % Path(x).as_posix() for x in extra_paths)
     path.write_text(
         f'[general]\noutput_dir = "{out.as_posix()}"\n\n'
         f'[source]\ncodex_dir = "{codex.as_posix()}"\nworkspaces = ["{work.as_posix()}"]\n\n'
         '[exclude]\nsecret_files = ["auth.json", "cap_sid"]\n'
         'secret_dirs = [".sandbox-secrets", ".tmp"]\n'
-        'cache_dirs = ["node_modules", "__pycache__"]\n\n'
+        'cache_dirs = ["node_modules", "__pycache__"]\n'
+        'paths = [\n' + paths + ']\n\n'
         '[pack]\nmax_part_mb = 450\n\n[upload]\nremote = "test:"\n',
         encoding="utf-8")
 
@@ -117,7 +125,7 @@ def main():
         codex, work = build_fake_env(root)
         cfg = tmp / "config.toml"
         out = tmp / "out"
-        write_config(cfg, out, codex, work)
+        write_config(cfg, out, codex, work, extra_paths=[work / "vendor-clone"])
 
         print("\n[1/4] 备份（全量）")
         run(SCRIPTS / "backup.py", "--full", "--date", "2026-01-02", "--config", cfg)
@@ -135,6 +143,8 @@ def main():
         for bad in (".secrets.ps1", ".env", "id_rsa", "cert.pem"):
             check(bad not in names, "密钥文件已排除：%s" % bad)
         check(".env.example" in names, "模板文件 .env.example 被保留（没误杀）")
+        check(not any("vendor-clone" in str(p) for p in scope.rglob("*")),
+              "exclude.paths 生效：第三方目录整目录跳过")
 
         # 数据库快照
         snap = scope / "05_系统数据" / "state_5.sqlite"

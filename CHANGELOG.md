@@ -26,6 +26,11 @@
 
 - 新增配置项 `secret_globs`（通配符形式的密钥文件）
 - `config.example.toml` 更新为加固后的默认清单
+- 新增配置项 `exclude.paths`：整目录排除（第三方项目 / 可重新下载的东西）
+  场景：克隆下来的上游 OSS 项目可能含密钥且文件数巨大（实测 950 个文件），
+  整目录跳过比逐文件排除更干净。
+- 冒烟测试新增 `exclude.paths` 回归用例
+
 - 冒烟测试新增密钥排除的回归用例：
   `.secrets.ps1` / `.env` / `id_rsa` / `cert.pem` 必须被排除，
   `.env.example`（模板）必须保留
