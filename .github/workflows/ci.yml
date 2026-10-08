@@ -13,8 +13,24 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        python: ["3.9", "3.11", "3.13"]
+        # Linux 跑全版本矩阵；Windows / macOS 各跑一个代表版本。
+        # 这样既覆盖了跨平台差异，又不会因为 macOS runner 排队而卡住 CI
+        # （macOS runner 容量紧张，实测会排队 15 分钟以上直至超时）。
+        include:
+          - os: ubuntu-latest
+            python: "3.9"
+          - os: ubuntu-latest
+            python: "3.11"
+          - os: ubuntu-latest
+            python: "3.13"
+          - os: windows-latest
+            python: "3.9"
+          - os: windows-latest
+            python: "3.11"
+          - os: windows-latest
+            python: "3.13"
+          - os: macos-latest
+            python: "3.13"
 
     steps:
       - uses: actions/checkout@v4
