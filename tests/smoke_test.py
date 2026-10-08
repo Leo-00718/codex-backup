@@ -20,6 +20,13 @@ REPO = Path(__file__).resolve().parent.parent
 SCRIPTS = REPO / "scripts"
 PY = sys.executable
 
+# Windows 控制台默认编码可能不是 UTF-8，先强制一下，否则打印中文会崩
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, OSError):
+        pass
+
 
 def build_fake_env(root: Path):
     """造一个最小的 Codex 数据目录 + 一个工作目录。"""

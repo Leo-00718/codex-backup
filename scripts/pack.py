@@ -71,6 +71,7 @@ def main():
     ap.add_argument("--config", default=None)
     args = ap.parse_args()
 
+    _config.setup_stdio()
     cfg = _config.load(args.config)
     max_part = int(cfg["pack"]["max_part_mb"]) * 1024 * 1024
 

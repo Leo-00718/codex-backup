@@ -108,6 +108,7 @@ def main():
     ap.add_argument("--config", default=None)
     args = ap.parse_args()
 
+    _config.setup_stdio()
     cfg = _config.load(args.config)
     if not args.zips and not args.archive:
         ap.error("请用 --zips 指向压缩包目录，或用 --archive 指向已解压目录")

@@ -24,6 +24,20 @@ DEFAULTS = {
 }
 
 
+def setup_stdio():
+    """强制标准输出/错误用 UTF-8。
+
+    为什么需要：Windows 控制台默认编码不一定是 UTF-8
+    （英文版是 cp1252，中文版是 cp936），
+    打印中文日志时会抛 UnicodeEncodeError 直接崩掉。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, OSError):
+            pass
+
+
 def expand(p: str) -> Path:
     """展开 ~ 和 %VAR% / $VAR 环境变量。"""
     p = os.path.expandvars(os.path.expanduser(str(p)))

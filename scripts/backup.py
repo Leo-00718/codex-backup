@@ -228,6 +228,7 @@ def main():
     ap.add_argument("--config", default=None)
     args = ap.parse_args()
 
+    _config.setup_stdio()
     cfg = _config.load(args.config)
     day = dt.date.fromisoformat(args.date)
     stamp = day.isoformat()
