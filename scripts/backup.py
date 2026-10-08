@@ -24,6 +24,7 @@ import fnmatch
 import hashlib
 import json
 import os
+import re
 import shutil
 import sqlite3
 import sys
@@ -95,6 +96,70 @@ def is_injected(text: str) -> bool:
     return any(m in text.lstrip()[:200] for m in INJECT_MARKERS)
 
 
+# ============================================================
+# 内容级密钥清除
+# ------------------------------------------------------------
+# 为什么需要：密钥经常不是「一个文件」，而是「藏在某个文件的内容里」——
+# 比如用户曾经在对话里粘贴过 App Secret，那条会话记录就成了泄漏源。
+# 仅靠文件名排除挡不住，必须扫内容。
+#
+# 设计要点：
+#   1. 不要要求「值后面必须紧跟收尾引号」—— 在 JSONL 里换行是字面的 \\n，
+#      值后面往往跟着转义字符而不是引号，加了收尾引号会漏杀。
+#   2. 私钥要求确实有一段密钥体，否则文档/测试里的示例字符串会被误杀。
+# ============================================================
+SECRET_VALUE_PATTERNS = [
+    # (标签, 正则, 保留第几组) —— 1 表示保留前缀、只替换值；0 表示整体替换
+    ("AppSecret",   re.compile(r"(?i)(app[_-]?secret[\"']?\s*[:=]\s*[\"'])([A-Za-z0-9_\-]{16,})"), 1),
+    ("BearerToken", re.compile(r"(?i)(bearer\s+)([A-Za-z0-9\-\._]{25,})"), 1),
+    ("APIKey",      re.compile(r"\bsk-[A-Za-z0-9_\-]{20,}"), 0),
+    ("GitHubToken", re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}"), 0),
+    ("SlackToken",  re.compile(r"\bxox[baprs]-[A-Za-z0-9\-]{10,}"), 0),
+    ("PrivateKey",  re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\\]{0,6}[A-Za-z0-9+/=\\]{64,}"), 0),
+]
+
+SECRET_MARK = "[REDACTED by codex-backup]"
+
+TEXT_EXTS = {".jsonl", ".json", ".md", ".txt", ".toml", ".yaml", ".yml",
+             ".py", ".ps1", ".psm1", ".bat", ".cmd", ".js", ".ts", ".csv", ".log", ".env"}
+
+SCAN_LIMIT = 20 * 1024 * 1024      # 超过这个大小就不扫，避免拖慢备份
+
+# 本次运行清除了哪些文件（供最后汇总）
+REDACTED_LOG = []
+
+
+def redact_in_place(path: Path, enabled: bool = True):
+    """就地清除文件里的密钥特征。返回命中的类型列表。"""
+    if not enabled or path.suffix.lower() not in TEXT_EXTS:
+        return []
+    try:
+        if path.stat().st_size > SCAN_LIMIT:
+            return []
+        text = path.read_text(encoding="utf-8", errors="surrogateescape")
+    except (OSError, UnicodeDecodeError):
+        return []
+
+    def _mk(keep):
+        def _sub(m):
+            return (m.group(1) + SECRET_MARK) if keep == 1 else SECRET_MARK
+        return _sub
+
+    hits = []
+    for label, pat, keep in SECRET_VALUE_PATTERNS:
+        text, n = pat.subn(_mk(keep), text)
+        if n:
+            hits.append("%s x%d" % (label, n))
+
+    if hits:
+        try:
+            path.write_text(text, encoding="utf-8", errors="surrogateescape")
+            REDACTED_LOG.append((str(path), hits))
+        except OSError:
+            return []
+    return hits
+
+
 def safe_copy(src: Path, dst: Path):
     """复制文件；目标已存在或只读（如 git 对象）时也能覆盖。"""
     dst.parent.mkdir(parents=True, exist_ok=True)
@@ -108,6 +173,7 @@ def safe_copy(src: Path, dst: Path):
         except OSError:
             pass
     shutil.copy2(str(src), str(dst))   # 保留权限 + 时间戳
+    redact_in_place(dst)               # ★ 内容级密钥清除
     if os.name == "nt":
         # Windows 上清掉只读属性方便下次覆盖；Unix 上不能无条件 chmod，
         # 否则会丢掉可执行位。
@@ -284,6 +350,9 @@ def main():
         if not args.dry_run:
             info = render_session(sf, conv / (sf.stem + ".md"))
             if info:
+                # Markdown 是从原始 jsonl 生成的，同样可能含密钥；
+                # 它不走 safe_copy，必须单独清一遍（踩过的坑）
+                redact_in_place(conv / (sf.stem + ".md"))
                 idx_sessions.append(info)
             dst = raw / sf.relative_to(sess_root)
             dst.parent.mkdir(parents=True, exist_ok=True)
@@ -394,6 +463,14 @@ def main():
 
     log("索引与清单已生成：%d 个文件, %s" % (
         len(manifest), _config.human(sum(m["size"] for m in manifest))))
+
+    if REDACTED_LOG:
+        log("")
+        log("!! 已在备份中清除 %d 个文件里的密钥内容：" % len(REDACTED_LOG))
+        for path, hits in REDACTED_LOG[:20]:
+            log("     %s  ->  %s" % (Path(path).name, ", ".join(hits)))
+        if len(REDACTED_LOG) > 20:
+            log("     ... 另有 %d 个" % (len(REDACTED_LOG) - 20))
     log("=== 完成 ===")
     return 0
 

@@ -77,6 +77,15 @@ def build_fake_env(root: Path):
 
     # 工作目录里的文件
     (work / "note.md").write_text("# 测试文件\n", encoding="utf-8")
+
+    # 内容里藏密钥的文件 —— 文件名正常，只能靠内容扫描发现
+    # （回归用例：真实场景里密钥常常是被粘贴进对话/文档的）
+    (work / "notes-with-secret.md").write_text(
+        "# 配置记录\n\nAPP_SECRET = 'js9DnajwjptvyGvgI5ayabYnaXc0E14Yzzzz'\n"
+        "key = sk-conjvmckx9j7m2hxyh91yh8kdbg282pqgs5lq\n"
+        "token = ghp_abcdefghijklmnopqrstuvwxyz0123456789\n",
+        encoding="utf-8")
+    (work / "plain.md").write_text("# 完全正常的文档\n没有密钥\n", encoding="utf-8")
     (work / "sub").mkdir()
     (work / "sub" / "code.py").write_text("print(1)\n", encoding="utf-8")
 
@@ -135,8 +144,10 @@ def main():
         check((scope / "04_清单.json").exists(), "清单已生成")
 
         # 密钥排除（回归用例）
+        # 注意：不能用 "SECRET" 这个词判断 —— APP_SECRET 是变量名，红字打码后它仍然在。
+        # 要判断的是「密钥的值」，不是「变量名」。
         leaked = [p for p in scope.rglob("*")
-                  if p.is_file() and ("auth.json" in p.name or "SECRET" in p.read_text(errors="ignore"))]
+                  if p.is_file() and "auth.json" in p.name]
         check(not leaked, "密钥文件已排除（auth.json / .sandbox-secrets 未进备份）")
 
         names = {p.name for p in scope.rglob("*") if p.is_file()}
@@ -145,6 +156,39 @@ def main():
         check(".env.example" in names, "模板文件 .env.example 被保留（没误杀）")
         check(not any("vendor-clone" in str(p) for p in scope.rglob("*")),
               "exclude.paths 生效：第三方目录整目录跳过")
+
+        # 内容级密钥清除（回归用例）
+        import re as _re
+        secret_pat = _re.compile(
+            r"(?i)(app[_-]?secret[\"']?\s*[:=]\s*[\"'][A-Za-z0-9]{16,}"
+            r"|\bsk-[A-Za-z0-9_\-]{20,}\b"
+            r"|\b(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}\b)")
+
+        found_any = False
+        for p in scope.rglob("*"):
+            if not p.is_file():
+                continue
+            if p.suffix.lower() not in (".md", ".txt", ".json", ".jsonl", ".py"):
+                continue
+            try:
+                txt = p.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            if secret_pat.search(txt):
+                found_any = True
+                print("       泄漏于:", p.relative_to(scope))
+        check(not found_any, "内容级密钥清除：备份里不含任何密钥内容")
+
+        # 确认打码标记出现（说明确实清除了，而不是整文件被丢）
+        redacted_files = [p for p in scope.rglob("*")
+                          if p.is_file() and p.suffix.lower() == ".md"
+                          and "[REDACTED by codex-backup]" in p.read_text(encoding="utf-8", errors="ignore")]
+        check(len(redacted_files) >= 1, "内容级密钥清除：确实生成了打码标记")
+
+        # 确认正常文件没被误伤
+        plain = list(scope.rglob("plain.md"))
+        check(bool(plain) and "没有密钥" in plain[0].read_text(encoding="utf-8", errors="ignore"),
+              "普通文档未被误伤")
 
         # 数据库快照
         snap = scope / "05_系统数据" / "state_5.sqlite"
